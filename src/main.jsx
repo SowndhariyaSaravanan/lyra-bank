@@ -14,6 +14,7 @@ import bankChoice from './bank-config';
 import LiveBank from './LiveBank';
 import { configuredEndpoint, readStorage, saveStorage } from './live-api';
 import './style.css';
+import './portal/theme.css';
 
 const supportsDemo = typeof bankChoice === 'string';
 const bank = supportsDemo ? banks[bankChoice] : bankChoice;

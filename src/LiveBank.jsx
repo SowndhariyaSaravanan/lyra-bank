@@ -4,6 +4,8 @@ import { ArrowLeftRight, Globe2, Landmark, List, LogOut, RefreshCw, Send } from 
 import { toPaise } from './ledger';
 import { configuredEndpoint, liveApi, parseEndpoint, readStorage, saveStorage } from './live-api';
 import './live.css';
+import PortalViews, { Hero, PortalNav } from './portal/Portal.jsx';
+import { PortalProvider } from './portal/PortalContext.jsx';
 
 const money = minor => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(minor / 100);
 const time = value => value ? new Intl.DateTimeFormat('en-IN', {
@@ -113,6 +115,7 @@ export default function LiveBank({ bank, switchUrl, openDemo }) {
   const [data, setData] = useState({ accounts: [], transfers: [] });
   const [directory, setDirectory] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [view, setView] = useState('home');
   const activeToken = useRef(null);
   activeToken.current = session?.token;
   const pending = useRef(new Map());
@@ -163,6 +166,7 @@ export default function LiveBank({ bank, switchUrl, openDemo }) {
     setLoaded(false);
     setData({ accounts: [], transfers: [] });
     setNote('');
+    setView('home');
   }
 
   async function signIn(event) {
@@ -205,9 +209,10 @@ export default function LiveBank({ bank, switchUrl, openDemo }) {
     await refresh();
   }
 
-  return <div className="layout live-bank-layout">
+  return <PortalProvider session={session} bank={bank}><div className="layout live-bank-layout">
     <aside className="sidebar"><div className="brand"><span className="brand-icon"><Landmark size={23} /></span>
       <span><strong>{bank.wordmark}</strong><small>BANKING PORTAL</small></span></div>
+      {session && <PortalNav view={view} onChange={setView} />}
       <nav aria-label="Bank actions">
         {session && <button onClick={() => refresh()}><RefreshCw size={18} /> Refresh balances</button>}
         {!configuredEndpoint && <button onClick={() => { setUrl(base); setEditUrl(!editUrl); }}><Globe2 size={18} /> Worker connection</button>}
@@ -218,12 +223,13 @@ export default function LiveBank({ bank, switchUrl, openDemo }) {
     </aside>
     <div className="main">
       <header className="topbar"><strong>{bank.name} · {bank.id}</strong><Chip label="Firestore test network" size="small" className="demo" /></header>
-      <main className="content live-bank-content">
+      <main className="content live-bank-content" data-view={session ? view : 'signed-out'}>
         <div className="page-head"><div><h1>{session ? 'Accounts and transfers' : 'Access your bank'}</h1>
           <p>{session ? 'Signed in as ' + session.email : 'Connect to the Worker and use your bank’s Firebase test login.'}</p>
         </div></div>
         {error && <Alert severity="error">{error}</Alert>}
         {note && <Alert severity="info" onClose={() => setNote('')}>{note}</Alert>}
+        {!session && <Hero bank={bank} />}
         {editUrl && <section className="panel"><header className="panel-head"><div><h2>Worker connection</h2>
           <p>Use the same Cloudflare Worker URL across the bank pages.</p></div></header>
           <form className="transfer-form" onSubmit={connect}><TextField label="Cloudflare Worker URL" fullWidth required value={url} onChange={e => setUrl(e.target.value)} />
@@ -239,6 +245,7 @@ export default function LiveBank({ bank, switchUrl, openDemo }) {
         {session && <>
           {loaded && !data.accounts.length && <Alert severity="info">This Firebase user has no synthetic account in this bank. Attach an account to this Firebase UID.</Alert>}
           {!loaded && <Alert severity="info">Loading your accounts and activity…</Alert>}
+          {view === 'home' && <>
           <div className="accounts">{data.accounts.map((account, i) =>
             <section key={account.accountId} className={'account-card ' + (i === 0 ? 'primary-account' : 'light-account')}>
               <div className="account-head"><span>{account.accountNumber}</span><Landmark size={19} /></div>
@@ -247,8 +254,10 @@ export default function LiveBank({ bank, switchUrl, openDemo }) {
             </section>)}</div>
           {data.accounts.length > 0 && <TransferForm bank={bank} accounts={data.accounts} directory={directory} send={send} />}
           <Activity rows={data.transfers} directory={directory} />
+          </>}
+          {view !== 'home' && <PortalViews view={view} bank={bank} data={data} directory={directory} loaded={loaded} onNavigate={setView} />}
         </>}
       </main>
     </div>
-  </div>;
+  </div></PortalProvider>;
 }
